@@ -13,6 +13,7 @@ numpy = "*"
 pandas = "*"
 scikit-learn = "*"
 torch = "*"
+loguru = "*"
 
 [dev-packages]
 

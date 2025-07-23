@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
 
-class DataProcessor:
+class DataPreprocessor:
     def __init__(self, movies_path, ratings_path, tags_path):
         self.movies_path = movies_path
         self.ratings_path = ratings_path
@@ -71,19 +71,12 @@ class DataProcessor:
         # 6. 生成标签（评分 >= 4 为正样本）
         df["label"] = df["rating"].apply(lambda x: 1 if x >= 4 else 0)
 
-        # 7. 选择用于 embedding 的稀疏特征列
-        sparse_cols = [
-            "userId",
-            "movieId",
-            "gender",
-            "age",
-            "occupation",
-            "genres",
-            "tag",
-        ]
-        df_model = df[sparse_cols + ["label"]].copy()
+        # 7. 选择用于 embedding 的稀疏特征列，单独处理数值特征列
+        sparse_cols = ["userId", "movieId", "gender", "occupation", "genres", "tag"]
+        dense_cols = ["age"]
+        df_model = df[sparse_cols + dense_cols + ["label"]].copy()
 
-        # 8. 编码稀疏特征
+        # 8. 稀疏特征编码
         for col in sparse_cols:
             le = LabelEncoder()
             if isinstance(df_model[col].iloc[0], list):
@@ -93,5 +86,11 @@ class DataProcessor:
                 df_model[col] = le.fit_transform(df_model[col])
             self.encoders[col] = le
             self.feature_dims[col] = len(le.classes_)
+
+        # 9. 数值特征 min-max 归一化
+        for col in dense_cols:
+            scaler = MinMaxScaler()
+            df_model[col] = scaler.fit_transform(df_model[[col]])
+
 
         return df_model

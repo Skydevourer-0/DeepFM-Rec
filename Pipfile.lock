@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "91ea6af03781b26ba9d1c88aab55136e7bb51211656de3d014d68d6fba70b529"
+            "sha256": "1414830781658e4866619a979b79ab46e8105620f89ebc8fcd43ed0fa7a31d26"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -9,7 +9,7 @@
         },
         "sources": [
             {
-                "name": "DLCF-Rec",
+                "name": "DeepFM-Rec",
                 "url": "https://pypi.tuna.tsinghua.edu.cn/simple",
                 "verify_ssl": true
             }
@@ -55,7 +55,7 @@
                 "sha256:59da8a3170004800a2837844bfa84d49b022550616070f7cb1a659682b2e7c9f",
                 "sha256:e1120c228ca2f553b470df4a5fa927ab66258467526069981b3eb0a91902687d"
             ],
-            "index": "DLCF-Rec",
+            "index": "DeepFM-Rec",
             "markers": "python_version >= '3.6'",
             "version": "==2.0.3"
         },
@@ -64,7 +64,7 @@
                 "sha256:6d33aef15b5bcead780acc339464aae8a6e28f13c90d8b1cf9de8b549d1c0b4b",
                 "sha256:7451b5001e17837ba58945aead261ba425fdf7b4f0448777e597ddab39f4fba0"
             ],
-            "index": "DLCF-Rec",
+            "index": "DeepFM-Rec",
             "version": "==0.5.0"
         },
         "flask-migrate": {
@@ -72,7 +72,7 @@
                 "sha256:57d6060839e3a7f150eaab6fe4e726d9e3e7cffe2150fb223d73f92421c6d1d9",
                 "sha256:a6498706241aba6be7a251078de9cf166d74307bca41a4ca3e403c9d39e2f897"
             ],
-            "index": "DLCF-Rec",
+            "index": "DeepFM-Rec",
             "markers": "python_version >= '3.6'",
             "version": "==3.1.0"
         },
@@ -81,7 +81,7 @@
                 "sha256:2bda44b43e7cacb15d4e05ff3cc1f8bc97936cc464623424102bfc2c35e95912",
                 "sha256:f12c3d4cc5cc7fdcc148b9527ea05671718c3ea45d50c7e732cceb33f574b390"
             ],
-            "index": "DLCF-Rec",
+            "index": "DeepFM-Rec",
             "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'",
             "version": "==2.5.1"
         },
@@ -158,7 +158,7 @@
                 "sha256:9dcc4547dbb1cb284accfb15ab5667a0e5d1881cc443e0677b4882a4067a807e",
                 "sha256:e0a968b5ba15f8a328fdfd7ab1fcb5af4470c28aaf7e55df02a99bc13138e6e8"
             ],
-            "index": "DLCF-Rec",
+            "index": "DeepFM-Rec",
             "markers": "python_version >= '3.5'",
             "version": "==20.1.0"
         },
@@ -332,7 +332,7 @@
                 "sha256:eccb9a159db9aed60800187bc47a6d3451553f0e1b08b068d8b277ddfbb9b244",
                 "sha256:ee8340cb48c9b7a5899d1149eece41ca535513a9698098edbade2a8e7a84da77"
             ],
-            "index": "DLCF-Rec",
+            "index": "DeepFM-Rec",
             "markers": "python_version >= '3.11'",
             "version": "==2.3.1"
         },
@@ -381,7 +381,7 @@
                 "sha256:fe67dc676818c186d5a3d5425250e40f179c2a89145df477dd82945eaea89e97",
                 "sha256:fe7317f578c6a153912bd2292f02e40c1d8f253e93c599e82620c7f69755c74f"
             ],
-            "index": "DLCF-Rec",
+            "index": "DeepFM-Rec",
             "markers": "python_version >= '3.9'",
             "version": "==2.3.1"
         },
@@ -429,7 +429,7 @@
                 "sha256:ca6d31fb10e04d50bfd2b50d66744729dbb512d4efd0223b864e2fdbfc4cee11",
                 "sha256:e3142f0abe1ad1d1c31a2ae987621e41f6b578144a911ff4ac94781a583adad7"
             ],
-            "index": "DLCF-Rec",
+            "index": "DeepFM-Rec",
             "markers": "python_version >= '3.10'",
             "version": "==1.7.1"
         },
@@ -676,7 +676,7 @@
                 "sha256:e0d81e9a12764b6f3879a866607c8ae93113cbcad57ce01ebde63eb48a576369",
                 "sha256:fe955951bdf32d182ee8ead6c3186ad54781492bf03d547d31771a01b3d6fb7d"
             ],
-            "index": "DLCF-Rec",
+            "index": "DeepFM-Rec",
             "markers": "python_full_version >= '3.9.0'",
             "version": "==2.7.1"
         },

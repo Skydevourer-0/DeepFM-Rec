@@ -1,7 +1,12 @@
 import pandas as pd
+from torch.utils.data import DataLoader
+
+from app.data.dataset import RecDataset
 
 
-def data_split(df_model: pd.DataFrame, multi_sparse, train_size=0.7, val_size=0.1):
+def data_split(
+    df_model: pd.DataFrame, multi_sparse, train_size=0.7, val_size=0.1
+) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
     将数据集分割为训练集，验证集和测试集
     :param df_model: 编码后的特征数据
@@ -26,5 +31,15 @@ def data_split(df_model: pd.DataFrame, multi_sparse, train_size=0.7, val_size=0.
     train_ms = {col: multi_sparse[col][train_idx] for col in multi_sparse}
     val_ms = {col: multi_sparse[col][val_idx] for col in multi_sparse}
     test_ms = {col: multi_sparse[col][test_idx] for col in multi_sparse}
+    # 定义稠密特征列表
+    dense_feats = ["age"]
+    # 构造数据集
+    train_dataset = RecDataset(train_df, train_ms, dense_feats)
+    val_dataset = RecDataset(val_df, val_ms, dense_feats)
+    test_dataset = RecDataset(test_df, test_ms, dense_feats)
+    # 构造加载器
+    train_loader = DataLoader(train_dataset, batch_size=1024, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=1024, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=1024, shuffle=True)
 
-    return (train_df, val_df, test_df), (train_ms, val_ms, test_ms)
+    return train_loader, val_loader, test_loader

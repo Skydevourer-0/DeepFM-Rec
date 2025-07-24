@@ -36,8 +36,10 @@ class RecDataset(Dataset):
         for feat, vals in self.multi_sparse.items():
             sample[feat] = torch.tensor(vals[idx], dtype=torch.int64)
         # 数值（稠密）特征
+        # 稠密特征的 Embedding 层是 nn.Linear，需要输入 2D 张量
+        # 因此特征值需要保存为 1D 张量，才能在 batch 的堆叠下成为 2D
         for feat in self.dense_feats:
-            sample[feat] = torch.tensor(self.df.iloc[idx][feat], dtype=torch.float32)
+            sample[feat] = torch.tensor([self.df.iloc[idx][feat]], dtype=torch.float32)
         # 标签
         sample["label"] = torch.tensor(self.df.iloc[idx]["label"], dtype=torch.float32)
 

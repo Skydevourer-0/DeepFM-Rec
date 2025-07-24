@@ -46,10 +46,13 @@ class EmbeddingLayer(nn.Module):
             val = samples[feat]
             # 对多值特征使用 EmbeddingBag
             if isinstance(layer, nn.EmbeddingBag):
-                # 此时 val 是 2D 张量，需要将其 flatten，并计算 offset
-                flats = val.flatten()
+                # 此时 val 是 2D 张量，其中存在非法值 -1
+                # 需要过滤非法值并 flatten，计算 offset
+                mask = val != -1  # (batches, max_len)
+                flats = val[mask]
                 # 通过累加长度计算 offsets
-                lens = torch.tensor([0] + [len(v) for v in val])
+                valid_cnts = mask.sum(dim=1)  # (batches,)
+                lens = torch.hstack((torch.zeros(1), valid_cnts))
                 offsets = lens.cumsum(dim=0)[:-1]
                 # 使用 EmbeddingBag 处理变长输入
                 embedded[feat] = layer(flats, offsets)

@@ -34,8 +34,7 @@ class RecDataset(Dataset):
             sample[feat] = torch.tensor(self.df.iloc[idx][feat], dtype=torch.int64)
         # 多值稀疏特征
         for feat, vals in self.multi_sparse.items():
-            valid_vals = vals[idx][vals[idx] != -1]
-            sample[feat] = torch.tensor(valid_vals, dtype=torch.int64)
+            sample[feat] = torch.tensor(vals[idx], dtype=torch.int64)
         # 数值（稠密）特征
         for feat in self.dense_feats:
             sample[feat] = torch.tensor(self.df.iloc[idx][feat], dtype=torch.float32)

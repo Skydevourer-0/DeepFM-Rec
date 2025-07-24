@@ -1,7 +1,12 @@
 [[source]]
+name = "tuna"
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 verify_ssl = true
-name = "DeepFM-Rec"
+
+[[source]]
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu126"
+verify_ssl = true
 
 [packages]
 flask = "==2.0.3"
@@ -12,8 +17,10 @@ gunicorn = "==20.1.0"
 numpy = "*"
 pandas = "*"
 scikit-learn = "*"
-torch = "*"
 loguru = "*"
+torch = {version = "*", index = "pytorch-cuda"}
+torchvision = {version = "*", index = "pytorch-cuda"}
+torchaudio = {version = "*", index = "pytorch-cuda"}
 
 [dev-packages]
 

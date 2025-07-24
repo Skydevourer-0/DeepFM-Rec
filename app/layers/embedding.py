@@ -23,9 +23,7 @@ class EmbeddingLayer(nn.Module):
             if feat in multi_feats:
                 # 对多值特征使用嵌入层 EmbeddingBag
                 # EmbeddingBag 可以处理变长输入，适合多值特征
-                self.embedding_layers[feat] = nn.EmbeddingBag(
-                    dim, embedding_dim, sparse=True
-                )
+                self.embedding_layers[feat] = nn.EmbeddingBag(dim, embedding_dim)
             else:
                 # 对单值特征使用嵌入层 Embedding
                 self.embedding_layers[feat] = nn.Embedding(dim, embedding_dim)

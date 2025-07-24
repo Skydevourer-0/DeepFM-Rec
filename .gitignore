@@ -1,2 +1,3 @@
 /resources/data
 /tmp
+**/__pycache__

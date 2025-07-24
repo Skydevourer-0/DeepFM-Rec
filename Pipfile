@@ -21,6 +21,8 @@ loguru = "*"
 torch = {version = "*", index = "pytorch-cuda"}
 torchvision = {version = "*", index = "pytorch-cuda"}
 torchaudio = {version = "*", index = "pytorch-cuda"}
+matplotlib = "*"
+tqdm = "*"
 
 [dev-packages]
 

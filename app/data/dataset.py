@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 
@@ -8,10 +9,18 @@ class RecDataset(Dataset):
     将数据集转换为 PyTorch Dataset 格式
     """
 
-    def __init__(self, df: pd.DataFrame, multi_sparse: dict, dense_feats: list = []):
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        multi_sparse: dict[str, np.ndarray],
+        multi_feats: list[str] = [],
+        dense_feats: list[str] = [],
+    ):
         self.df = df
         self.multi_sparse = multi_sparse
-        self.sparse_feats = df.columns.difference(dense_feats + ["label"]).tolist()
+        self.sparse_feats = df.columns.difference(
+            dense_feats + multi_feats + ["label"]
+        ).tolist()
         self.dense_feats = dense_feats
         self.labels = df["label"].astype("float32").values
 

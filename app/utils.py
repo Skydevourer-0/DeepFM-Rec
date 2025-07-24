@@ -1,3 +1,5 @@
+from typing import Callable, Optional
+
 import pandas as pd
 from torch.utils.data import DataLoader
 
@@ -31,15 +33,50 @@ def data_split(
     train_ms = {col: multi_sparse[col][train_idx] for col in multi_sparse}
     val_ms = {col: multi_sparse[col][val_idx] for col in multi_sparse}
     test_ms = {col: multi_sparse[col][test_idx] for col in multi_sparse}
-    # 定义稠密特征列表
+    # 定义多值稀疏特征列和稠密特征列
+    multi_feats = ["genres", "tag"]
     dense_feats = ["age"]
     # 构造数据集
-    train_dataset = RecDataset(train_df, train_ms, dense_feats)
-    val_dataset = RecDataset(val_df, val_ms, dense_feats)
-    test_dataset = RecDataset(test_df, test_ms, dense_feats)
+    train_dataset = RecDataset(train_df, train_ms, multi_feats, dense_feats)
+    val_dataset = RecDataset(val_df, val_ms, multi_feats, dense_feats)
+    test_dataset = RecDataset(test_df, test_ms, multi_feats, dense_feats)
     # 构造加载器
     train_loader = DataLoader(train_dataset, batch_size=1024, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=1024, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=1024, shuffle=True)
 
     return train_loader, val_loader, test_loader
+
+
+class EarlyStopping:
+    """早停器，训练时判断验证集指标变化，避免过拟化"""
+
+    def __init__(
+        self, patience=3, mode="max", on_continue: Optional[Callable[[], None]] = None
+    ):
+        self.patience = patience
+        self.mode = mode
+        self.on_continue = on_continue
+        self.best_score = None
+        self.counter = 0
+        self.early_stop = False
+
+        if mode == "min":
+            self.compare = lambda current, best: current < best
+            self.best_score = float("inf")
+        else:
+            self.compare = lambda current, best: current > best
+            self.best_score = float("-inf")
+
+    def step(self, curr_score):
+        if self.compare(curr_score, self.best_score):
+            self.best_score = curr_score
+            self.counter = 0
+            if self.on_continue is not None:
+                self.on_continue()
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
+
+        return self.early_stop

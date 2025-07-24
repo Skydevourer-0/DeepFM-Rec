@@ -51,8 +51,8 @@ class EmbeddingLayer(nn.Module):
                 mask = val != -1  # (batches, max_len)
                 flats = val[mask]
                 # 通过累加长度计算 offsets
-                valid_cnts = mask.sum(dim=1)  # (batches,)
-                lens = torch.hstack((torch.zeros(1), valid_cnts))
+                valid_cnts = mask.sum(dim=1).tolist()  # (batches,)
+                lens = torch.tensor([0] + valid_cnts, device=val.device)
                 offsets = lens.cumsum(dim=0)[:-1]
                 # 使用 EmbeddingBag 处理变长输入
                 embedded[feat] = layer(flats, offsets)

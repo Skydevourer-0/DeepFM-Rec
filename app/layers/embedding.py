@@ -10,13 +10,15 @@ class EmbeddingLayer(nn.Module):
     def __init__(
         self,
         feature_dims: dict[str, int],
-        embedding_dim: int = 16,
         multi_feats: list[str] = [],
+        dense_feats: list[str] = [],
+        embedding_dim: int = 16,
     ):
         super().__init__()
         self.embedding_layers = nn.ModuleDict()
 
         # 初始化嵌入层
+        # 稀疏特征
         for feat, dim in feature_dims.items():
             if feat in multi_feats:
                 # 对多值特征使用嵌入层 EmbeddingBag
@@ -27,6 +29,9 @@ class EmbeddingLayer(nn.Module):
             else:
                 # 对单值特征使用嵌入层 Embedding
                 self.embedding_layers[feat] = nn.Embedding(dim, embedding_dim)
+        # 稠密特征
+        for feat in dense_feats:
+            self.embedding_layers[feat] = nn.Linear(1, embedding_dim, bias=False)
 
     def forward(self, samples: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
@@ -36,16 +41,18 @@ class EmbeddingLayer(nn.Module):
         """
         embedded = {}
         for feat, layer in self.embedding_layers.items():
-            if feat in samples:
-                # 对多值特征使用 EmbeddingBag
-                if isinstance(layer, nn.EmbeddingBag):
-                    # 此时 samples[feat] 是 2D 张量，需要将其 flatten，并计算 offset
-                    flats = samples[feat].flatten()
-                    # 通过累加长度计算 offsets
-                    lens = torch.tensor([0] + [len(v) for v in samples[feat]])
-                    offsets = lens.cumsum(dim=0)[:-1]
-                    # 使用 EmbeddingBag 处理变长输入
-                    embedded[feat] = layer(flats, offsets)
-                else:
-                    embedded[feat] = layer(samples[feat])
+            if feat not in samples:
+                continue
+            val = samples[feat]
+            # 对多值特征使用 EmbeddingBag
+            if isinstance(layer, nn.EmbeddingBag):
+                # 此时 val 是 2D 张量，需要将其 flatten，并计算 offset
+                flats = val.flatten()
+                # 通过累加长度计算 offsets
+                lens = torch.tensor([0] + [len(v) for v in val])
+                offsets = lens.cumsum(dim=0)[:-1]
+                # 使用 EmbeddingBag 处理变长输入
+                embedded[feat] = layer(flats, offsets)
+            else:
+                embedded[feat] = layer(val)
         return embedded

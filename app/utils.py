@@ -49,23 +49,28 @@ def data_split(
 
 
 class EarlyStopping:
-    """早停器，训练时判断验证集指标变化，避免过拟化"""
+    """早停器，训练时判断验证集指标变化，避免过拟合"""
 
     def __init__(
-        self, patience=3, mode="max", on_continue: Optional[Callable[[], None]] = None
+        self,
+        patience=5,
+        mode="max",
+        delta=1e-3,
+        on_continue: Optional[Callable[[], None]] = None,
     ):
         self.patience = patience
         self.mode = mode
+        self.delta = delta
         self.on_continue = on_continue
         self.best_score = None
         self.counter = 0
         self.early_stop = False
 
         if mode == "min":
-            self.compare = lambda current, best: current < best
+            self.compare = lambda current, best: current < best - delta
             self.best_score = float("inf")
         else:
-            self.compare = lambda current, best: current > best
+            self.compare = lambda current, best: current > best + delta
             self.best_score = float("-inf")
 
     def step(self, curr_score):

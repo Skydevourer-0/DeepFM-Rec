@@ -94,7 +94,7 @@ class Trainer:
         self.optimizer = torch.optim.Adam(model.parameters())
         # 学习率调度器，当指标多轮未优化时令学习率下降
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, mode="max", factor=0.5, patience=2
+            self.optimizer, mode="max", factor=0.5, patience=5, threshold=1e-5
         )
 
     def _save_best_model(self):

@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Optional
 
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 from loguru import logger
 from sklearn.metrics import roc_auc_score
@@ -135,8 +134,8 @@ class Trainer:
             epoch_loss += loss.item()
             # 记录当前 batch 预测值和真实值
             # 使用 detach 断开 logits 与计算图的链接
-            preds.append(logits.detach().cpu().numpy())
-            targets.append(labels.cpu().numpy())
+            preds.append(logits.detach())
+            targets.append(labels)
 
         # 计算平均损失
         avg_loss = epoch_loss / len(dataloader)
@@ -144,10 +143,10 @@ class Trainer:
         # 仅当验证时计算 AUC 分数
         if not training:
             # 拼接预测值和真实值，并 ravel 展开为 1D
-            preds = np.concatenate(preds).ravel()
-            targets = np.concatenate(targets).ravel()
+            preds = torch.cat(preds).flatten()
+            targets = torch.cat(targets).flatten()
             # 计算 AUC 分数
-            auc_score = roc_auc_score(targets, preds)
+            auc_score = roc_auc_score(targets.cpu().numpy(), preds.cpu().numpy())
 
         return avg_loss, auc_score
 

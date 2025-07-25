@@ -16,7 +16,7 @@ def main():
     try:
         preprocessor = DataPreprocessor(data_path / "raw")
         # 载入预处理数据
-        df_model, multi_sparse, feature_dims, _ = preprocessor.load(encoded_path)
+        df_model, multi_sparse, feature_dims = preprocessor.load(encoded_path)
         # 分割数据集
         train_loader, val_loader, test_loader = data_split(df_model, multi_sparse)
     except Exception as e:

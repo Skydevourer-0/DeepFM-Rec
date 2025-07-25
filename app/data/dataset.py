@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 import torch
 from torch.utils.data import Dataset
 
@@ -12,7 +11,7 @@ class RecDataset(Dataset):
     def __init__(
         self,
         df: pd.DataFrame,
-        multi_sparse: dict[str, np.ndarray],
+        multi_sparse: dict[str, torch.Tensor],
         multi_feats: list[str] = [],
         dense_feats: list[str] = [],
     ):
@@ -34,7 +33,7 @@ class RecDataset(Dataset):
             sample[feat] = torch.tensor(self.df.iloc[idx][feat], dtype=torch.int64)
         # 多值稀疏特征
         for feat, vals in self.multi_sparse.items():
-            sample[feat] = torch.tensor(vals[idx], dtype=torch.int64)
+            sample[feat] = vals[idx]
         # 数值（稠密）特征
         # 稠密特征的 Embedding 层是 nn.Linear，需要输入 2D 张量
         # 因此特征值需要保存为 1D 张量，才能在 batch 的堆叠下成为 2D

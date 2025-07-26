@@ -6,14 +6,14 @@ from app.layers.embedding import EmbeddingLayer
 
 class FactorizationMachine(nn.Module):
     """
-    因子分解机（FM），用于建模特征之间的二阶交互关系。
+    因子分解机 (FM)，用于建模特征之间的二阶交互关系。
     公式：
         y = w_0 + sum(w_i * x_i) + sum(<v_i, v_j> * x_i * x_j)
     其中：
         - w_0：全局偏置
-        - w_i：每个特征的一阶权重（可用 embedding_dim=1 的嵌入层实现）
-        - x_i：输入特征的编码（通常为 LabelEncoder 编码后的索引）
-        - v_i：每个特征的嵌入向量（embedding）
+        - w_i：每个特征的一阶权重 (可用 embedding_dim=1 的嵌入层实现)
+        - x_i：输入特征的编码 (顺序的整数，可以作为 nn.Embedding 中的查表索引)
+        - v_i：每个特征的嵌入向量 (embedding)
         - <v_i, v_j>：v_i 与 v_j 的内积，表示二阶特征交互
     实现说明：
         - 输入特征可直接使用编码后的索引，无需 one-hot。

@@ -9,7 +9,7 @@ class EmbeddingLayer(nn.Module):
 
     def __init__(
         self,
-        feature_dims: dict[str, int],
+        sparse_n_cls: dict[str, int],
         multi_feats: list[str] = [],
         dense_feats: list[str] = [],
         embedding_dim: int = 16,
@@ -19,14 +19,14 @@ class EmbeddingLayer(nn.Module):
 
         # 初始化嵌入层
         # 稀疏特征
-        for feat, dim in feature_dims.items():
+        for feat, input_dim in sparse_n_cls.items():
             if feat in multi_feats:
                 # 对多值特征使用嵌入层 EmbeddingBag
                 # EmbeddingBag 可以处理变长输入，适合多值特征
-                self.embedding_layers[feat] = nn.EmbeddingBag(dim, embedding_dim)
+                self.embedding_layers[feat] = nn.EmbeddingBag(input_dim, embedding_dim)
             else:
                 # 对单值特征使用嵌入层 Embedding
-                self.embedding_layers[feat] = nn.Embedding(dim, embedding_dim)
+                self.embedding_layers[feat] = nn.Embedding(input_dim, embedding_dim)
         # 稠密特征
         for feat in dense_feats:
             self.embedding_layers[feat] = nn.Linear(1, embedding_dim, bias=False)
@@ -34,7 +34,7 @@ class EmbeddingLayer(nn.Module):
     def forward(self, samples: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         """
         嵌入特征
-        :param samples: 输入的特征数据，RecDataset.__getitem__ 返回的样本
+        :param samples: 输入的特征数据，DataLoader 载入的样本集
         :return: 嵌入向量
         """
         embedded = {}
@@ -44,14 +44,8 @@ class EmbeddingLayer(nn.Module):
             val = samples[feat]
             # 对多值特征使用 EmbeddingBag
             if isinstance(layer, nn.EmbeddingBag):
-                # 此时 val 是 2D 张量，其中存在非法值 -1
-                # 需要过滤非法值并 flatten，计算 offset
-                mask = val != -1  # (batches, max_len)
-                flats = val[mask]
-                # 通过累加长度计算 offsets
-                valid_cnts = mask.sum(dim=1).tolist()  # (batches,)
-                lens = torch.tensor([0] + valid_cnts, device=val.device)
-                offsets = lens.cumsum(dim=0)[:-1]
+                # 此时 val 是 (flats, offsets)
+                flats, offsets = val
                 # 使用 EmbeddingBag 处理变长输入
                 embedded[feat] = layer(flats, offsets)
             else:

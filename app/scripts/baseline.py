@@ -3,9 +3,9 @@ from pathlib import Path
 from loguru import logger
 
 from app.data.preprocessor import DataPreprocessor
+from app.data.dataset import RecDataset
 from app.models.fm_model import FMModule
 from app.train import Trainer
-from app.utils import data_split
 
 
 def main():
@@ -16,9 +16,10 @@ def main():
     try:
         preprocessor = DataPreprocessor(data_path / "raw")
         # 载入预处理数据
-        df_model, multi_sparse, feature_dims = preprocessor.load(encoded_path)
+        encoded_feats, sparse_n_cls = preprocessor.load(encoded_path)
         # 分割数据集
-        train_loader, val_loader, test_loader = data_split(df_model, multi_sparse)
+        dataset = RecDataset(encoded_feats, dense_feats=["age"])
+        train_loader, val_loader, test_loader = dataset.split()
     except Exception as e:
         logger.exception(f"数据预处理出错: {repr(e)}")
         return
@@ -28,7 +29,7 @@ def main():
         multi_feats = ["genres", "tag"]
         dense_feats = ["age"]
         # 构造模型实例
-        fm_model = FMModule(feature_dims, multi_feats, dense_feats)
+        fm_model = FMModule(sparse_n_cls, multi_feats, dense_feats)
         # 构造训练器实例
         trainer = Trainer(fm_model, train_loader, val_loader)
         # 开始训练

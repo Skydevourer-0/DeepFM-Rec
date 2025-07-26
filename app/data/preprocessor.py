@@ -13,18 +13,15 @@ class DataPreprocessor:
         self.movies_path = raw_path / "movies.csv"
         self.ratings_path = raw_path / "ratings.csv"
         self.tags_path = raw_path / "tags.csv"
-        # 用户信息, user_id: {'gender': ..., 'age': ..., 'occupation': ...}
-        self.user_info = {}
-        self.feature_dims = {}
-        # 存储多值特征的稀疏编码, 编码值存储为 2D 张量
-        self.multi_sparse = dict[str, torch.Tensor]()
+        # 存储稀疏特征的编码类别数
+        self.sparse_n_cls = {}
 
     def _generate_user_info(self, user_ids) -> pd.DataFrame:
         """批量生成用户信息"""
         shape = (len(user_ids),)
         genders = torch.randint(0, 2, shape)
         ages = torch.randint(18, 61, shape)
-        occus = torch.randint(0, 10, shape)  # 共 10 种职业
+        occus = torch.randint(0, 21, shape)  # 共 20 种职业
         return pd.DataFrame(
             {
                 "userId": user_ids,
@@ -34,29 +31,29 @@ class DataPreprocessor:
             }
         )
 
-    def _encode_list_label(
-        self, col_labels: pd.Series, col: str
-    ) -> tuple[torch.Tensor, int]:
-        """多值稀疏编码"""
-        flat_labels = [label for labels in col_labels for label in labels]
-        # 采用 pd.unique, 性能比 le 内部采用的 np.unique 好
-        unique_vals = pd.Series(flat_labels).dropna().unique()
-        encoder = {v: i for i, v in enumerate(unique_vals)}
+    def _encode_sparse_feat(
+        self, series: pd.Series
+    ) -> tuple[torch.Tensor | list[list[str]], int]:
+        """稀疏特征编码"""
+        if isinstance(series.iloc[0], list):
+            # 多值特征编码, 展开变长列表后再进行映射
+            flats = [val for values in series for val in values]
+            # 采用 pd.unique, 性能比 LabelEncoder 内部采用的 np.unique 好
+            uniques = pd.Series(flats).dropna().unique()
+            encoder = {v: i for i, v in enumerate(uniques)}
+            # 张量不支持变长列表，记录原始的变长列表
+            encoded_col = series.apply(lambda lst: [encoder.get(x) for x in lst])
+            encoded_col = encoded_col.values.tolist()
+        else:
+            # 单值特征编码，直接进行映射
+            uniques = series.dropna().unique()
+            encoder = {v: i for i, v in enumerate(uniques)}
+            # pd.Series.map 不支持直接映射 list
+            encoded_col = torch.tensor(series.map(encoder).values, dtype=torch.int64)
 
-        # 记录最大列表长度，作为矩阵维度
-        max_len = max(len(labels) for labels in col_labels)
-        # 存储为 2D 张量
-        encoded = torch.full((len(col_labels), max_len), -1, dtype=torch.int64)
-        tqdm_desc = f"编码多值稀疏特征 {col}"
-        for i, labels in enumerate(tqdm(col_labels, desc=tqdm_desc, ncols=100)):
-            # 矩阵的前 len(labels) 列存储为编码值
-            encoded[i, : len(labels)] = torch.tensor(
-                [encoder.get(x, -1) for x in labels], dtype=torch.int64
-            )
+        return encoded_col, len(uniques)
 
-        return encoded, len(unique_vals)
-
-    def fit_transform(self):
+    def fit_transform(self) -> dict[str, torch.Tensor | list[list[str]]]:
         # 1. 加载数据
         logger.info("读取原始数据...")
         movies = pd.read_csv(self.movies_path)
@@ -96,87 +93,75 @@ class DataPreprocessor:
         logger.info("生成二分类标签...")
         df["label"] = df["rating"].apply(lambda x: 1 if x >= 4 else 0)
 
-        # 7. 选择用于 embedding 的稀疏特征列，单独处理数值特征列
+        # 7. 选择用于 embedding 的稀疏特征列，单独处理稠密（数值）特征列
         sparse_cols = ["userId", "movieId", "gender", "occupation", "genres", "tag"]
         dense_cols = ["age"]
-        df_model = df[sparse_cols + dense_cols + ["label"]].copy()
-        # 打乱数据, 方便后续切分训练集和测试集
-        df_model = df_model.sample(frac=1, random_state=42).reset_index(drop=True)
 
-        # 8. 稀疏特征编码
+        # 8. 构造字典存储编码结果
+        encoded = dict[str, torch.Tensor | list[list[str]]]()
+
+        # 9. 稀疏特征编码
         logger.info("稀疏特征编码...")
-        for col in tqdm(sparse_cols, ncols=100):
-            if isinstance(df_model[col].iloc[0], list):
-                # 多值特征编码
-                encoded, label_cnt = self._encode_list_label(df_model[col], col)
-                self.multi_sparse[col] = encoded
-                self.feature_dims[col] = label_cnt
-            else:
-                # 单值稀疏编码
-                unique_vals = df_model[col].dropna().unique()
-                encoder = {v: i for i, v in enumerate(unique_vals)}
-                # pd.Series.map, 直接进行映射
-                df_model[col] = df_model[col].map(encoder)
-                self.feature_dims[col] = len(unique_users)
+        for col in tqdm(sparse_cols, desc="稀疏特征编码", ncols=100):
+            encoded_col, n_cls = self._encode_sparse_feat(df[col])
+            encoded[col] = encoded_col
+            self.sparse_n_cls[col] = n_cls
 
-        # 9. 数值特征 min-max 归一化
-        logger.info("数值特征归一化...")
+        # 10. 稠密特征编码，min-max 归一化
+        logger.info("稠密特征归一化...")
         for col in dense_cols:
-            scaler = MinMaxScaler()
-            df_model[col] = scaler.fit_transform(df_model[[col]])
+            # 通过 df[[col]] 传入 (n, 1) 的 二维数据，匹配接口
+            encoded_list = MinMaxScaler().fit_transform(df[[col]]).flatten()
+            encoded[col] = torch.tensor(encoded_list, dtype=torch.float32)
 
-        return df_model
+        # 11. 存储标签值
+        encoded["label"] = torch.tensor(df["label"].values, dtype=torch.float32)
 
-    def save(self, dir_path: Path, df_model: pd.DataFrame):
+        return encoded
+
+    def save(
+        self, dir_path: Path, encoded_feats: dict[str, torch.Tensor | list[list[str]]]
+    ) -> None:
         dir_path.mkdir(parents=True, exist_ok=True)
-        # 保存多值稀疏特征矩阵
-        logger.info("保存多值稀疏特征矩阵...")
-        for col, matrix in self.multi_sparse.items():
-            torch.save(matrix, dir_path / f"multi_sparse_{col}.pt")
-        # 保存特征维度
-        logger.info("保存特征维度信息...")
-        with open(dir_path / "feature_dims.json", "w") as f:
-            json.dump(self.feature_dims, f, indent=2)
-        # 保存编码后特征数据
-        logger.info("保存编码后的特征数据...")
-        df_model.to_csv(dir_path / "df_model.csv", index=False)
+        # 保存特征类别数
+        logger.info("保存稀疏特征类别数...")
+        with open(dir_path / "sparse_n_cls.json", "w") as f:
+            json.dump(self.sparse_n_cls, f, indent=2)
+        # 保存特征值编码，此时为张量列表，使用 pt 存储
+        logger.info("保存特征值编码...")
+        torch.save(encoded_feats, dir_path / "encoded_feats.pt")
 
-    def load(self, dir_path: Path):
+    def load(
+        self, dir_path: Path
+    ) -> tuple[dict[str, torch.Tensor | list[list[str]]], dict[str, int]]:
         # 判断关键文件是否存在
         required_files = [
-            dir_path / "df_model.csv",
-            dir_path / "feature_dims.json",
-            dir_path / "multi_sparse_genres.pt",
-            dir_path / "multi_sparse_tag.pt",
+            dir_path / "encoded_feats.pt",
+            dir_path / "sparse_n_cls.json",
         ]
         missing = [f for f in required_files if not f.exists()]
         if missing:
             logger.info("部分编码文件缺失，重新进行特征处理和编码...")
-            df_model = self.fit_transform()
-            self.save(dir_path, df_model)
+            encoded_feats = self.fit_transform()
+            self.save(dir_path, encoded_feats)
         else:
-            # 读取多值稀疏特征矩阵
-            logger.info("加载多值稀疏特征矩阵...")
-            self.multi_sparse = {}
-            for fn in dir_path.glob("multi_sparse_*.pt"):
-                col = fn.stem.split("multi_sparse_")[1]
-                self.multi_sparse[col] = torch.load(fn)
-            # 读取特征维度
-            logger.info("加载特征维度信息...")
-            with open(dir_path / "feature_dims.json", "r") as f:
-                self.feature_dims = json.load(f)
+            # 读取特征类别数
+            logger.info("加载特征类别数...")
+            with open(dir_path / "sparse_n_cls.json", "r") as f:
+                self.sparse_n_cls = json.load(f)
             # 读取编码后特征数据
-            logger.info("加载编码后的特征数据...")
-            df_model = pd.read_csv(dir_path / "df_model.csv")
+            logger.info("加载特征值编码...")
+            encoded_feats = torch.load(dir_path / "encoded_feats.pt")
 
-        return df_model, self.multi_sparse, self.feature_dims
+        return encoded_feats, self.sparse_n_cls
 
 
 if __name__ == "__main__":
     data_path = Path("resources/data")
     preprocessor = DataPreprocessor(data_path / "raw")
     try:
-        df_model = preprocessor.fit_transform()
-        preprocessor.save(data_path / "encoded", df_model)
+        encoded_feats = preprocessor.fit_transform()
+        preprocessor.save(data_path / "encoded", encoded_feats)
+        # encoded_feats, sparse_n_cls = preprocessor.load(data_path / "encoded")
     except Exception as e:
         logger.exception(e)

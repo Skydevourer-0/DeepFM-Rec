@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Optional
 
 import torch
@@ -55,33 +56,28 @@ class RecDataset(Dataset):
         return sample
 
     @staticmethod
-    def _make_collate_fn(multi_feats: list[str] = []):
-        """函数工厂"""
-
-        def collate_fn(batch: list[dict[str, torch.Tensor]]):
-            """
-            DataLoader 调用的堆叠方法，对多值稀疏特征进行特殊处理
-            """
-            if not batch:
-                return None
-            collated = {}
-            for feat in batch[0].keys():
-                values = [sample[feat] for sample in batch]
-                # 多值稀疏特征
-                if feat in multi_feats:
-                    # 变长列表无法 stack, 存储为 values 和 offsets 两个张量
-                    # 拼接所有值，将变长列表展开为 1D 张量
-                    flats = torch.cat(values)
-                    # 累加长度计算偏移量
-                    lens = [0] + [len(x) for x in values]
-                    offsets = torch.tensor(lens, dtype=torch.int64).cumsum(dim=0)[:-1]
-                    # 输出堆叠结果
-                    collated[feat] = (flats, offsets)
-                else:
-                    collated[feat] = torch.stack(values)
-            return collated
-
-        return collate_fn
+    def _collate_fn(batch: list[dict[str, torch.Tensor]], multi_feats: list[str] = []):
+        """
+        DataLoader 调用的堆叠方法，对多值稀疏特征进行特殊处理
+        """
+        if not batch:
+            return None
+        collated = {}
+        for feat in batch[0].keys():
+            values = [sample[feat] for sample in batch]
+            # 多值稀疏特征
+            if feat in multi_feats:
+                # 变长列表无法 stack, 存储为 values 和 offsets 两个张量
+                # 拼接所有值，将变长列表展开为 1D 张量
+                flats = torch.cat(values)
+                # 累加长度计算偏移量
+                lens = [0] + [len(x) for x in values]
+                offsets = torch.tensor(lens, dtype=torch.int64).cumsum(dim=0)[:-1]
+                # 输出堆叠结果
+                collated[feat] = (flats, offsets)
+            else:
+                collated[feat] = torch.stack(values)
+        return collated
 
     @staticmethod
     def to_device(batch, device):
@@ -132,7 +128,8 @@ class RecDataset(Dataset):
         nparams = {
             "batch_size": batch_size,
             "shuffle": shuffle,
-            "collate_fn": self._make_collate_fn(multi_feats),
+            "pin_memory": True,
+            "collate_fn": partial(self._collate_fn, multi_feats=multi_feats),
         }
         train_loader = DataLoader(train_dataset, **nparams)
         val_loader = DataLoader(val_dataset, **nparams)

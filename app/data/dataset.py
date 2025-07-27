@@ -18,8 +18,8 @@ class RecDataset(Dataset):
     ):
         self.encoded = encoded_feats
         # 特征编码字典的每个 value 的长度均为 样本数
-        self.n_samples = self._infer_length()
-        self.indices = indices if indices is not None else torch.arange(self.n_samples)
+        n_samples = self._infer_length()
+        self.indices = indices if indices is not None else torch.arange(n_samples)
         # 构造稀疏特征列表
         self.sparse_feats = [
             k for k in encoded_feats.keys() if k not in (dense_feats + ["label"])
@@ -83,6 +83,21 @@ class RecDataset(Dataset):
 
         return collate_fn
 
+    @staticmethod
+    def to_device(batch, device):
+        """将张量移动到设备中，便于 gpu 优化"""
+        to_device = lambda x: x.to(device, non_blocking=True)
+        labels = to_device(batch["label"])
+        samples = {}
+        for feat, val in batch.items():
+            if feat == "label":
+                continue
+            if isinstance(val, torch.Tensor):
+                samples[feat] = to_device(val)
+            elif isinstance(val, (tuple, list)):
+                samples[feat] = tuple(map(to_device, val))
+        return labels, samples
+
     def split(
         self, train_size=0.7, val_size=0.1, batch_size=1024, shuffle=True, seed=42
     ) -> tuple[DataLoader, DataLoader, DataLoader]:
@@ -94,7 +109,7 @@ class RecDataset(Dataset):
         :return: 训练集，验证集和测试集的特征数据及多值稀疏特征矩阵
         """
         # 确定各个输出集合的大小
-        n_total = self.n_samples
+        n_total = len(self)
         n_train = int(n_total * train_size)
         n_val = int(n_total * val_size)
         # 构造数据集索引

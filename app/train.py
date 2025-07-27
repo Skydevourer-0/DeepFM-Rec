@@ -11,6 +11,7 @@ from torch.nn import Module, functional
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from app.data.dataset import RecDataset
 from app.utils import EarlyStopping
 
 
@@ -82,7 +83,8 @@ class Trainer:
 
         :return: None，无返回值
         """
-        self.model = model
+        # 将模型移到设备中
+        self.model = model.to(device)
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.device = device
@@ -114,8 +116,7 @@ class Trainer:
             dataloader, desc="Training" if training else "Validate", ncols=100
         ):
             # 将张量移动到设备中，便于 gpu 优化
-            labels = batch["label"].float().to(self.device)
-            samples = {f: t.to(self.device) for f, t in batch.items() if f != "label"}
+            labels, samples = RecDataset.to_device(batch, self.device)
             # 梯度置零
             if training:
                 self.optimizer.zero_grad()
@@ -169,8 +170,6 @@ class Trainer:
 
     def train(self, epochs: int):
         """训练模型"""
-        # 将模型移到设备中
-        self.model.to(self.device)
         train_losses, val_losses, val_aucs = [], [], []
 
         # 开始迭代

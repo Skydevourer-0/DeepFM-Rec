@@ -1,6 +1,7 @@
 from typing import Optional
+
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 
 class RecDataset(Dataset):

@@ -1,4 +1,6 @@
+import gzip
 import json
+import pickle
 from pathlib import Path
 
 import pandas as pd
@@ -120,23 +122,33 @@ class DataPreprocessor:
         return encoded
 
     def save(
-        self, dir_path: Path, encoded_feats: dict[str, torch.Tensor | list[list[str]]]
+        self, dir_path: Path, encoded: dict[str, torch.Tensor | list[list[str]]]
     ) -> None:
         dir_path.mkdir(parents=True, exist_ok=True)
         # 保存特征类别数
         logger.info("保存稀疏特征类别数...")
         with open(dir_path / "sparse_n_cls.json", "w") as f:
             json.dump(self.sparse_n_cls, f, indent=2)
-        # 保存特征值编码，此时为张量列表，使用 pt 存储
-        logger.info("保存特征值编码...")
-        torch.save(encoded_feats, dir_path / "encoded_feats.pt")
+        # 保存特征值编码
+        # 拆分单值特征和多值特征
+        single_feats = {k: v for k, v in encoded.items() if isinstance(v, torch.Tensor)}
+        multi_feats = {k: v for k, v in encoded.items() if isinstance(v, list)}
+        # 单值特征编码为 tensor, 存储为 pt
+        logger.info("保存单值特征编码...")
+        with gzip.open(dir_path / "single_feats.pt.gz", "wb") as f:
+            torch.save(single_feats, f)  # type: ignore
+        # 多值特征编码为 list[list[str]], 存储为 pkl.gz
+        logger.info("保存多值特征编码...")
+        with gzip.open(dir_path / "multi_feats.pkl.gz", "wb") as f:
+            pickle.dump(multi_feats, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     def load(
         self, dir_path: Path
     ) -> tuple[dict[str, torch.Tensor | list[list[str]]], dict[str, int]]:
         # 判断关键文件是否存在
         required_files = [
-            dir_path / "encoded_feats.pt",
+            dir_path / "single_feats.pt.gz",
+            dir_path / "multi_feats.pkl.gz",
             dir_path / "sparse_n_cls.json",
         ]
         missing = [f for f in required_files if not f.exists()]
@@ -149,9 +161,15 @@ class DataPreprocessor:
             logger.info("加载特征类别数...")
             with open(dir_path / "sparse_n_cls.json", "r") as f:
                 self.sparse_n_cls = json.load(f)
-            # 读取编码后特征数据
-            logger.info("加载特征值编码...")
-            encoded_feats = torch.load(dir_path / "encoded_feats.pt")
+            # 读取特征值编码
+            logger.info("加载单值特征编码...")
+            with gzip.open(dir_path / "single_feats.pt.gz", "rb") as f:
+                single_feats = torch.load(f)  # type: ignore
+            logger.info("加载多值特征编码...")
+            with gzip.open(dir_path / "multi_feats.pkl.gz", "rb") as f:
+                multi_feats = pickle.load(f)
+            # 整合单值特征和多值特征
+            encoded_feats = {**single_feats, **multi_feats}
 
         return encoded_feats, self.sparse_n_cls
 

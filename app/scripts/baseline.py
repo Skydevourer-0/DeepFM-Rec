@@ -2,8 +2,8 @@ from pathlib import Path
 
 from loguru import logger
 
-from app.data.preprocessor import DataPreprocessor
 from app.data.dataset import RecDataset
+from app.data.preprocessor import DataPreprocessor
 from app.models.fm_model import FMModule
 from app.train import Trainer
 

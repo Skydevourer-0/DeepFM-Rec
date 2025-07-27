@@ -13,7 +13,7 @@ class RecDataset(Dataset):
     def __init__(
         self,
         # 多值稀疏特征编码存储为变长列表，其余特征编码存储为张量
-        encoded_feats: dict[str, torch.Tensor | list[list[str]]],
+        encoded_feats: dict[str, torch.Tensor | list[list[int]]],
         indices: Optional[torch.Tensor] = None,
         dense_feats: list[str] = [],
     ):

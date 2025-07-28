@@ -7,7 +7,7 @@ class EarlyStopping:
     def __init__(
         self,
         patience=5,
-        mode="max",
+        mode="min",
         delta=1e-3,
         on_continue: Optional[Callable[[], None]] = None,
     ):

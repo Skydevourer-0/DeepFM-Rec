@@ -19,7 +19,7 @@ def main():
         encoded_feats, sparse_n_cls = preprocessor.load(encoded_path)
         # 分割数据集
         dataset = RecDataset(encoded_feats, dense_feats=["age"])
-        train_loader, val_loader, test_loader = dataset.split()
+        train_loader, valid_loader, test_loader = dataset.split()
     except Exception as e:
         logger.exception(f"数据预处理出错: {repr(e)}")
         return
@@ -31,7 +31,7 @@ def main():
         # 构造模型实例
         fm_model = FMModule(sparse_n_cls, multi_feats, dense_feats)
         # 构造训练器实例
-        trainer = Trainer(fm_model, train_loader, val_loader)
+        trainer = Trainer(fm_model, train_loader, valid_loader)
         # # 开始训练
         # best_model, metrics = trainer.train(epochs=100)
         # # 绘制指标
@@ -39,10 +39,10 @@ def main():
         # # 保存训练结果
         # trainer.save_model(model_path / "model_weights.pth", best_model)
         # # 测试模型
-        # loss, auc = trainer.evaluate(test_loader, best_model)
+        # loss, mse = trainer.evaluate(test_loader, best_model)
         # 训练一轮
-        loss, auc = trainer._one_epoch(train_loader, training=True)
-        logger.info(f"测试集评估指标: BCE 损失: {loss:.2f}, AUC 分数: {auc:.2f}")
+        loss, mae = trainer._one_epoch(train_loader, training=True)
+        logger.info(f"测试集评估指标: MSE 损失: {loss:.4f}, MAE 损失: {mae:.4f}")
 
     except Exception as e:
         logger.exception(f"模型训练出错: {repr(e)}")

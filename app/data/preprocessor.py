@@ -1,4 +1,3 @@
-import gzip
 import json
 import pickle
 from pathlib import Path
@@ -104,9 +103,9 @@ class DataPreprocessor:
         # 3. 对 genres 编码，进行 ragged 处理
         movies["genres"] = self._encode_multi_sparse(movies["genres"], "genres")
 
-        # 4. 生成标签（评分 >= 4 为正样本）
-        logger.info("生成二分类标签...")
-        ratings["label"] = (ratings["rating"] >= 4).astype(float)
+        # 4. 将 rating 作为回归任务的标签
+        logger.info("生成回归标签...")
+        ratings.rename(columns={"rating": "label"}, inplace=True)
 
         # 5. 合并 ratings 与 movies
         logger.info("合并评分表与电影表...")
@@ -130,17 +129,14 @@ class DataPreprocessor:
         user_df = self._generate_user_info(unique_users)
         df = df.merge(user_df, on="userId", how="left")
 
-        # 7. 选择用于 embedding 的稠密（数值）特征列
-        dense_feats = ["age"]
+        # 8. 选择需要归一化的稠密（数值）特征列，其中 label 是回归任务的标签
+        dense_feats = ["age", "label"]
 
-        # 8. 构造字典存储编码结果
+        # 9. 构造字典存储编码结果
         encoded = dict[str, torch.Tensor | list[list[int]]]()
         logger.info("特征编码...")
         for feat in tqdm(df.columns, desc="特征编码", ncols=100):
             encoded[feat] = self._encode_feat(df, feat, dense_feats)
-
-        # 11. 存储标签值
-        encoded["label"] = torch.tensor(df["label"].values, dtype=torch.float32)
 
         return encoded
 
@@ -158,11 +154,10 @@ class DataPreprocessor:
         multi_feats = {k: v for k, v in encoded.items() if isinstance(v, list)}
         # 单值特征编码为 tensor, 存储为 pt
         logger.info("保存单值特征编码...")
-        with gzip.open(dir_path / "single_feats.pt.gz", "wb") as f:
-            torch.save(single_feats, f)  # type: ignore
+        torch.save(single_feats, dir_path / "single_feats.pt")
         # 多值特征编码为 list[list[int]], 存储为 pkl.gz
         logger.info("保存多值特征编码...")
-        with gzip.open(dir_path / "multi_feats.pkl.gz", "wb") as f:
+        with open(dir_path / "multi_feats.pkl", "wb") as f:
             pickle.dump(multi_feats, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     def load(
@@ -170,8 +165,8 @@ class DataPreprocessor:
     ) -> tuple[dict[str, torch.Tensor | list[list[int]]], dict[str, int]]:
         # 判断关键文件是否存在
         required_files = [
-            dir_path / "single_feats.pt.gz",
-            dir_path / "multi_feats.pkl.gz",
+            dir_path / "single_feats.pt",
+            dir_path / "multi_feats.pkl",
             dir_path / "sparse_n_cls.json",
         ]
         missing = [f for f in required_files if not f.exists()]
@@ -186,10 +181,9 @@ class DataPreprocessor:
                 self.sparse_n_cls = json.load(f)
             # 读取特征值编码
             logger.info("加载单值特征编码...")
-            with gzip.open(dir_path / "single_feats.pt.gz", "rb") as f:
-                single_feats = torch.load(f)  # type: ignore
+            single_feats = torch.load(dir_path / "single_feats.pt")
             logger.info("加载多值特征编码...")
-            with gzip.open(dir_path / "multi_feats.pkl.gz", "rb") as f:
+            with open(dir_path / "multi_feats.pkl", "rb") as f:
                 multi_feats = pickle.load(f)
             # 整合单值特征和多值特征
             encoded_feats = {**single_feats, **multi_feats}

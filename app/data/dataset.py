@@ -95,19 +95,19 @@ class RecDataset(Dataset):
         return labels, samples
 
     def split(
-        self, train_size=0.7, val_size=0.1, batch_size=1024, shuffle=True, seed=42
+        self, train_size=0.7, valid_size=0.1, batch_size=1024, shuffle=True, seed=42
     ) -> tuple[DataLoader, DataLoader, DataLoader]:
         """
         将数据集分割为训练集，验证集和测试集
 
         :param train_size: 训练集占比
-        :param val_size: 验证集占比
+        :param valid_size: 验证集占比
         :return: 训练集，验证集和测试集的特征数据及多值稀疏特征矩阵
         """
         # 确定各个输出集合的大小
         n_total = len(self)
         n_train = int(n_total * train_size)
-        n_val = int(n_total * val_size)
+        n_val = int(n_total * valid_size)
         # 构造数据集索引
         indices = torch.arange(n_total)
         if shuffle:
@@ -115,14 +115,14 @@ class RecDataset(Dataset):
             indices = indices[torch.randperm(n_total, generator=rand_generator)]
         # 分割数据集索引
         train_indices = indices[:n_train]
-        val_indices = indices[n_train : n_train + n_val]
+        valid_indices = indices[n_train : n_train + n_val]
         test_indices = indices[n_train + n_val :]
         # 定义多值稀疏特征列和稠密特征列
         multi_feats = ["genres", "tag"]
         dense_feats = ["age"]
         # 根据索引构造数据集
         train_dataset = RecDataset(self.encoded, train_indices, dense_feats)
-        val_dataset = RecDataset(self.encoded, val_indices, dense_feats)
+        valid_dataset = RecDataset(self.encoded, valid_indices, dense_feats)
         test_dataset = RecDataset(self.encoded, test_indices, dense_feats)
         # 构造加载器
         nparams = {
@@ -132,7 +132,7 @@ class RecDataset(Dataset):
             "collate_fn": partial(self._collate_fn, multi_feats=multi_feats),
         }
         train_loader = DataLoader(train_dataset, **nparams)
-        val_loader = DataLoader(val_dataset, **nparams)
+        valid_loader = DataLoader(valid_dataset, **nparams)
         test_loader = DataLoader(test_dataset, **nparams)
 
-        return train_loader, val_loader, test_loader
+        return train_loader, valid_loader, test_loader

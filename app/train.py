@@ -6,7 +6,7 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import torch
 from loguru import logger
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import mean_absolute_error
 from torch.nn import Module, functional
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -16,44 +16,51 @@ from app.utils import EarlyStopping
 
 
 class TrainMetrics:
-    """训练结果"""
+    """训练过程中的指标收集和绘图工具"""
 
-    def __init__(self, train_losses, val_losses=[], val_aucs=[]):
-        self.train_losses = train_losses
-        self.val_losses = val_losses
-        self.val_aucs = val_aucs
+    def __init__(
+        self,
+        train_losses: Optional[list[float]] = None,
+        train_maes: Optional[list[float]] = None,
+        valid_losses: Optional[list[float]] = None,
+        valid_maes: Optional[list[float]] = None,
+    ):
+        self.train_losses = train_losses or []
+        self.train_maes = train_maes or []
+        self.valid_losses = valid_losses or []
+        self.valid_maes = valid_maes or []
 
     def draw(self, save_path: Optional[str | Path] = None):
         """绘制指标曲线"""
-        train_losses = self.train_losses
-        val_losses = self.val_losses
-        val_aucs = self.val_aucs
+        epochs = range(1, len(self.train_losses) + 1)
 
-        epochs = range(1, len(train_losses) + 1)
-        plt.figure(figsize=(12, 5))
+        # 根据已有指标动态确定子图数量
+        metrics_to_plot = {
+            "Train Loss": self.train_losses,
+            "Train MAE": self.train_maes,
+            "Valid Loss": self.valid_losses,
+            "Valid MAE": self.valid_maes,
+        }
+        # 过滤掉空指标
+        metrics_to_plot = {k: v for k, v in metrics_to_plot.items() if v}
 
-        # Loss 图
-        plt.subplot(1, 2, 1)
-        plt.plot(epochs, train_losses, label="Train Loss")
-        if val_losses:
-            plt.plot(epochs, val_losses, label="Val Loss")
-        plt.xlabel("Epoch")
-        plt.ylabel("Loss")
-        plt.title("Binary Cross Entropy Loss Curve")
-        plt.legend()
+        n_plots = len(metrics_to_plot)
+        if n_plots == 0:
+            logger.warning("没有可绘制的指标数据")
+            return
 
-        # AUC 图
-        if val_aucs:
-            plt.subplot(1, 2, 2)
-            plt.plot(epochs, val_aucs, label="Val AUC", color="orange")
+        plt.figure(figsize=(6 * n_plots, 5))
+
+        for i, (name, values) in enumerate(metrics_to_plot.items(), 1):
+            plt.subplot(1, n_plots, i)
+            plt.plot(epochs, values, marker="o")
             plt.xlabel("Epoch")
-            plt.ylabel("AUC")
-            plt.title("AUC Score Curve")
-            plt.legend()
+            plt.ylabel(name)
+            plt.title(f"{name} Curve")
+            plt.grid(True)
 
         plt.tight_layout()
 
-        # 保存图片（如果提供了路径）
         if save_path:
             save_path = Path(save_path)
             save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -70,7 +77,7 @@ class Trainer:
         self,
         model: Module,
         train_loader: DataLoader,
-        val_loader: Optional[DataLoader],
+        valid_loader: Optional[DataLoader],
         device: torch.device = (
             torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         ),
@@ -78,7 +85,7 @@ class Trainer:
         """
         :param model: PyTorch 模型，继承自 torch.nn.Module
         :param train_loader: 训练集 DataLoader，提供训练数据批次
-        :param val_loader: 验证集 DataLoader，提供验证数据批次（可选）
+        :param valid_loader: 验证集 DataLoader，提供验证数据批次（可选）
         :param device: 设备，默认为 CPU，可传入 GPU 设备
 
         :return: None，无返回值
@@ -86,7 +93,7 @@ class Trainer:
         # 将模型移到设备中
         self.model = model.to(device)
         self.train_loader = train_loader
-        self.val_loader = val_loader
+        self.valid_loader = valid_loader
         self.device = device
         self.best_model_state = None
         # 早停器，避免过拟化
@@ -95,7 +102,7 @@ class Trainer:
         self.optimizer = torch.optim.Adam(model.parameters())
         # 学习率调度器，当指标多轮未优化时令学习率下降
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, mode="max", factor=0.5, patience=5, threshold=1e-5
+            self.optimizer, mode="min", factor=0.5, patience=5, threshold=1e-5
         )
 
     def _save_best_model(self):
@@ -124,8 +131,8 @@ class Trainer:
             with torch.set_grad_enabled(training):
                 # __call__() 自动调用 forward() 等方法
                 logits = self.model(samples)
-                # 计算 BCE(二分类交叉熵损失)
-                loss = functional.binary_cross_entropy_with_logits(logits, labels)
+                # 回归模型，采用 MSE (均方误差)
+                loss = functional.mse_loss(logits, labels)
                 if training:
                     # 反向传播
                     loss.backward()
@@ -140,24 +147,21 @@ class Trainer:
 
         # 计算平均损失
         avg_loss = epoch_loss / len(dataloader)
-        auc_score = 0.0
-        # 仅当验证时计算 AUC 分数
-        if not training:
-            # 拼接预测值和真实值，并 ravel 展开为 1D
-            preds = torch.cat(preds).flatten()
-            targets = torch.cat(targets).flatten()
-            # 计算 AUC 分数
-            auc_score = roc_auc_score(targets.cpu().numpy(), preds.cpu().numpy())
+        # 计算 MAE(平均绝对误差)指标
+        mae_score = 0.0
+        preds = torch.cat(preds).flatten()
+        targets = torch.cat(targets).flatten()
+        mae_score = mean_absolute_error(targets.cpu().numpy(), preds.cpu().numpy())
 
-        return avg_loss, auc_score
+        return avg_loss, mae_score
 
     def evaluate(self, dataloader: DataLoader, model_state=None):
         """评估模型指标"""
         # 载入模型参数
         if model_state is not None:
             self.model.load_state_dict(model_state)
-        loss, auc = self._one_epoch(dataloader, training=False)
-        return loss, auc
+        loss, mae = self._one_epoch(dataloader, training=False)
+        return loss, mae
 
     def load_model(self, path: Path):
         model_state = torch.load(path, map_location=self.device)
@@ -170,27 +174,29 @@ class Trainer:
 
     def train(self, epochs: int):
         """训练模型"""
-        train_losses, val_losses, val_aucs = [], [], []
+        train_losses, train_maes = [], []
+        valid_losses, valid_maes = [], []
 
         # 开始迭代
         for epoch in range(epochs):
             start_time = time.perf_counter()
-            loss, _ = self._one_epoch(self.train_loader, training=True)
+            loss, mae = self._one_epoch(self.train_loader, training=True)
             train_losses.append(loss)
-            metric_str = f"Epoch {epoch+1}/{epochs} | Train Loss: {loss:.4f}"
+            train_maes.append(mae)
+            metric_str = f"Epoch {epoch+1}/{epochs} | Train Loss: {loss:.4f} | Train MAE: {mae:.4f}"
 
-            if self.val_loader:
-                loss, auc_score = self._one_epoch(self.val_loader, training=False)
-                val_losses.append(loss)
-                val_aucs.append(auc_score)
+            if self.valid_loader:
+                loss, mae = self._one_epoch(self.valid_loader, training=False)
+                valid_losses.append(loss)
+                valid_maes.append(mae)
                 # 传入指标，更新学习率
-                self.scheduler.step(auc_score)
+                self.scheduler.step(mae)
                 # 更新早停器
-                if self.early_stopping.step(auc_score):
+                if self.early_stopping.step(mae):
                     logger.info(f"避免过拟合，在第 {epoch} 轮早停.")
                     break
 
-                metric_str += f" | Val Loss: {loss:.4f} | Val AUC: {auc_score:.4f}"
+                metric_str += f" | Valid Loss: {loss:.4f} | Valid MAE: {mae:.4f}"
             elapsed = time.perf_counter() - start_time
             metric_str += f" | Cost: {elapsed:.2f} s"
             # 打印当前轮次的指标
@@ -198,5 +204,5 @@ class Trainer:
 
         if self.best_model_state is None:
             self._save_best_model()
-        metrics = TrainMetrics(train_losses, val_losses, val_aucs)
+        metrics = TrainMetrics(train_losses, valid_maes, valid_losses, valid_maes)
         return self.best_model_state, metrics

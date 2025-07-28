@@ -1,5 +1,25 @@
 from typing import Callable, Optional
 
+import numpy as np
+import pandas as pd
+import torch
+
+
+def min_max_scale_tensor(x, min_val=None, max_val=None, eps=1e-8) -> torch.Tensor:
+    """
+    min-max 归一化，支持 pd.Series, np.ndarray, torch.Tensor
+    """
+
+    if isinstance(x, pd.Series):
+        x = torch.tensor(x.values, dtype=torch.float32)
+    elif isinstance(x, np.ndarray):
+        x = torch.tensor(x, dtype=torch.float32)
+    if min_val is None:
+        min_val = x.min(dim=0, keepdim=True).values
+    if max_val is None:
+        max_val = x.max(dim=0, keepdim=True).values
+    return (x - min_val) / (max_val - min_val + eps)
+
 
 class EarlyStopping:
     """早停器，训练时判断验证集指标变化，避免过拟合"""

@@ -5,8 +5,9 @@ from pathlib import Path
 import pandas as pd
 import torch
 from loguru import logger
-from sklearn.preprocessing import MinMaxScaler
 from tqdm import tqdm
+
+from app.utils import min_max_scale_tensor
 
 
 class DataPreprocessor:
@@ -63,9 +64,7 @@ class DataPreprocessor:
         """特征编码，包括稠密特征和单值稀疏特征"""
         if feat in dense_feats:
             # 稠密特征编码, min-max 归一化
-            # 需要将 series 转化为 2D 形式，匹配接口输入
-            encoded_list = MinMaxScaler().fit_transform(df[[feat]]).flatten()
-            encoded = torch.tensor(encoded_list, dtype=torch.float32)
+            encoded = min_max_scale_tensor(df[feat])
             return encoded
         elif feat in self.sparse_flats:
             # 多值稀疏特征编码, 从 (flats, offsets) 中提取变长列表

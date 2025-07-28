@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from app.data.dataset import RecDataset
-from app.utils import EarlyStopping
+from app.utils import EarlyStopping, min_max_scale_tensor
 
 
 class TrainMetrics:
@@ -131,6 +131,8 @@ class Trainer:
             with torch.set_grad_enabled(training):
                 # __call__() 自动调用 forward() 等方法
                 logits = self.model(samples)
+                # 模型输出结果需要 min-max 归一化，与数据预处理中标签的处理一致
+                logits = min_max_scale_tensor(logits)
                 # 回归模型，采用 MSE (均方误差)
                 loss = functional.mse_loss(logits, labels)
                 if training:

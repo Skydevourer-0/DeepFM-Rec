@@ -1,15 +1,13 @@
 from pathlib import Path
 
 from loguru import logger
-from memory_profiler import profile
 
 from app.data.manager import RecDataManager
 from app.data.preprocessor import DataPreprocessor
 from app.models.fm_model import FMModule
 from app.train import Trainer
+from tests.test_performance import test_performance_one_epoch
 
-
-@profile
 def main():
     data_path = Path("resources/data")
     encoded_path = data_path / "encoded"
@@ -42,8 +40,9 @@ def main():
         # # 测试模型
         # loss, mse = trainer.evaluate(test_loader, best_model)
         # 训练一轮
-        loss, mae = trainer._one_epoch(train_loader, training=True)
-        logger.info(f"测试集评估指标: MSE 损失: {loss:.4f}, MAE 损失: {mae:.4f}")
+        test_performance_one_epoch(trainer, train_loader)
+        # loss, mae = trainer._one_epoch(train_loader, training=True)
+        # logger.info(f"测试集评估指标: MSE 损失: {loss:.4f}, MAE 损失: {mae:.4f}")
 
     except Exception as e:
         logger.exception(f"模型训练出错: {repr(e)}")

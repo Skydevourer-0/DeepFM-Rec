@@ -23,6 +23,7 @@ torchvision = {version = "*", index = "pytorch-cuda"}
 torchaudio = {version = "*", index = "pytorch-cuda"}
 matplotlib = "*"
 tqdm = "*"
+pytest = "*"
 
 [dev-packages]
 

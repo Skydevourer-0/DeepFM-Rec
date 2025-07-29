@@ -3,7 +3,7 @@ from pathlib import Path
 from loguru import logger
 from memory_profiler import profile
 
-from app.data.dataset import RecDataset
+from app.data.manager import RecDataManager
 from app.data.preprocessor import DataPreprocessor
 from app.models.fm_model import FMModule
 from app.train import Trainer
@@ -20,8 +20,10 @@ def main():
         # 载入预处理数据
         encoded_feats, n_samples, sparse_shapes = preprocessor.load(encoded_path)
         # 分割数据集
-        dataset = RecDataset(encoded_feats, n_samples=n_samples)
-        train_loader, valid_loader, test_loader = dataset.split(train_size=0.1)
+        manager = RecDataManager(encoded_feats, n_samples=n_samples)
+        train_loader, valid_loader, test_loader = manager.split(
+            num_workers=4, pin_memory=True, train_size=0.1
+        )
     except Exception as e:
         logger.exception(f"数据预处理出错: {repr(e)}")
         return

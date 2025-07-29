@@ -11,7 +11,7 @@ from torch.nn import Module, functional
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from app.data.dataset import RecDataset
+from app.data.manager import RecDataManager
 from app.utils.utils import EarlyStopping, min_max_scale_tensor
 
 
@@ -123,7 +123,7 @@ class Trainer:
             dataloader, desc="Training" if training else "Validate", ncols=100
         ):
             # 将张量移动到设备中，便于 gpu 优化
-            labels, samples = RecDataset.to_device(batch, self.device)
+            labels, samples = RecDataManager.to_device(batch, self.device)
             # 梯度置零
             if training:
                 self.optimizer.zero_grad()

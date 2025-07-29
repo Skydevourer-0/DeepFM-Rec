@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from app.data.dataset import RecDataset
-from app.utils import EarlyStopping, min_max_scale_tensor
+from app.utils.utils import EarlyStopping, min_max_scale_tensor
 
 
 class TrainMetrics:

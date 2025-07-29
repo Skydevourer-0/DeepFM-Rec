@@ -11,15 +11,11 @@ class FMModule(nn.Module):
 
     def __init__(
         self,
-        feature_dims: dict[str, int],
-        multi_feats: list[str] = [],
-        dense_feats: list[str] = [],
+        sparse_shapes: dict[str, int],
         embedding_dim: int = 16,
     ):
         super().__init__()
-        self.fm_layer = FactorizationMachine(
-            feature_dims, multi_feats, dense_feats, embedding_dim
-        )
+        self.fm_layer = FactorizationMachine(sparse_shapes, embedding_dim)
 
     def forward(self, samples: dict[str, torch.Tensor]):
         fm_out = self.fm_layer.forward(samples)  # (batches,)

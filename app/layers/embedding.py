@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 
+from config import FEAT_NAMES
+
 
 class EmbeddingLayer(nn.Module):
     """
@@ -9,17 +11,16 @@ class EmbeddingLayer(nn.Module):
 
     def __init__(
         self,
-        sparse_n_cls: dict[str, int],
-        multi_feats: list[str] = [],
-        dense_feats: list[str] = [],
+        sparse_shapes: dict[str, int],
         embedding_dim: int = 16,
     ):
         super().__init__()
         self.embedding_layers = nn.ModuleDict()
-
+        multi_feats = FEAT_NAMES["multi_sparse_feats"]
+        dense_feats = FEAT_NAMES["dense_feats"]
         # 初始化嵌入层
         # 稀疏特征
-        for feat, input_dim in sparse_n_cls.items():
+        for feat, input_dim in sparse_shapes.items():
             if feat in multi_feats:
                 # 对多值特征使用嵌入层 EmbeddingBag
                 # EmbeddingBag 可以处理变长输入，适合多值特征

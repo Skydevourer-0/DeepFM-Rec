@@ -2,6 +2,7 @@ import torch
 from torch import nn
 
 from app.layers.embedding import EmbeddingLayer
+from config import FEAT_NAMES
 
 
 class FactorizationMachine(nn.Module):
@@ -24,24 +25,18 @@ class FactorizationMachine(nn.Module):
 
     def __init__(
         self,
-        feature_dims: dict[str, int],
-        multi_feats: list[str] = [],
-        dense_feats: list[str] = [],
+        sparse_shapes: dict[str, int],
         embedding_dim: int = 16,
     ):
         super().__init__()
         # 特征顺序
-        self.feat_order = list(feature_dims.keys()) + dense_feats
+        self.feat_order = list(sparse_shapes.keys()) + FEAT_NAMES["dense_feats"]
         # 偏置值
         self.bias = nn.Parameter(torch.zeros(1))
         # 一阶项，embedding_dim 设为 1，即为线性映射
-        self.linear_layers = EmbeddingLayer(
-            feature_dims, multi_feats, dense_feats, embedding_dim=1
-        )
+        self.linear_layers = EmbeddingLayer(sparse_shapes, embedding_dim=1)
         # 二阶项
-        self.cross_layers = EmbeddingLayer(
-            feature_dims, multi_feats, dense_feats, embedding_dim=embedding_dim
-        )
+        self.cross_layers = EmbeddingLayer(sparse_shapes, embedding_dim=embedding_dim)
 
     def forward(self, samples: dict[str, torch.Tensor]):
         # 一阶项

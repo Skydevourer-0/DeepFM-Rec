@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from loguru import logger
+from memory_profiler import profile
 
 from app.data.dataset import RecDataset
 from app.data.preprocessor import DataPreprocessor
@@ -8,6 +9,7 @@ from app.models.fm_model import FMModule
 from app.train import Trainer
 
 
+@profile
 def main():
     data_path = Path("resources/data")
     encoded_path = data_path / "encoded"
@@ -16,20 +18,17 @@ def main():
     try:
         preprocessor = DataPreprocessor(data_path / "raw")
         # 载入预处理数据
-        encoded_feats, sparse_n_cls = preprocessor.load(encoded_path)
+        encoded_feats, n_samples, sparse_shapes = preprocessor.load(encoded_path)
         # 分割数据集
-        dataset = RecDataset(encoded_feats, dense_feats=["age"])
-        train_loader, valid_loader, test_loader = dataset.split()
+        dataset = RecDataset(encoded_feats, n_samples=n_samples)
+        train_loader, valid_loader, test_loader = dataset.split(train_size=0.1)
     except Exception as e:
         logger.exception(f"数据预处理出错: {repr(e)}")
         return
 
     try:
-        # 构造多值稀疏特征列和稠密特征列
-        multi_feats = ["genres", "tag"]
-        dense_feats = ["age"]
         # 构造模型实例
-        fm_model = FMModule(sparse_n_cls, multi_feats, dense_feats)
+        fm_model = FMModule(sparse_shapes)
         # 构造训练器实例
         trainer = Trainer(fm_model, train_loader, valid_loader)
         # # 开始训练

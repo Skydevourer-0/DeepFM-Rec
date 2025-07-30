@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 import torch
+from torch import profiler
 from torch.profiler import ProfilerActivity, profile, record_function
 from torch.utils.data import DataLoader
 
@@ -9,6 +10,7 @@ from app.data.manager import RecDataManager
 from app.data.preprocessor import DataPreprocessor
 from app.models.fm_model import FMModule
 from app.train import Trainer
+from config import PROJECT_ROOT
 
 
 # 设置模块级别，数据加载和训练器构造只需执行一次
@@ -31,9 +33,7 @@ def data_manager():
 def trainer(data_manager):
     # 使用 fixture 自动注入
     train_loader, valid_loader, sparse_shapes = data_manager
-    multi_feats = ["genres", "tag"]
-    dense_feats = ["age"]
-    fm_model = FMModule(sparse_shapes, multi_feats, dense_feats)
+    fm_model = FMModule(sparse_shapes)
     trainer = Trainer(fm_model, train_loader, valid_loader)
 
     return trainer
@@ -54,23 +54,33 @@ def test_performance_one_epoch(trainer: Trainer, data_loader: DataLoader):
     :param data_loader: DataLoader 实例
     """
 
+    use_cuda = torch.cuda.is_available()
+    activities = [ProfilerActivity.CPU]
+    if use_cuda:
+        activities.append(ProfilerActivity.CUDA)
+
+    log_path = str(PROJECT_ROOT / "logs/perf")
+    # 定义采样计划
+    prof_schedule = profiler.schedule(wait=2, warmup=2, active=5, repeat=1)
     with profile(
-        activities=[
-            ProfilerActivity.CPU,
-            (
-                ProfilerActivity.CUDA
-                if torch.cuda.is_available()
-                else ProfilerActivity.CPU
-            ),
-        ],
+        activities=activities,
+        schedule=prof_schedule,
         record_shapes=True,
         profile_memory=True,
+        with_flops=True,
+        with_modules=True,
         with_stack=True,
+        on_trace_ready=profiler.tensorboard_trace_handler(log_path),
     ) as prof:
-        # 重点代码区域：训练一轮
         with record_function("train_one_epoch"):
-            loss, mae = trainer._one_epoch(data_loader, training=True)
-            print(f"Loss: {loss:.4f}, MAE: {mae:.4f}")
+            loss, mae = trainer._one_epoch(data_loader, training=True, profile=prof)
+            print(f"[Performance] Loss: {loss:.4f}, MAE: {mae:.4f}")
 
-    # 你还可以导出成 chrome trace json，方便用 chrome://tracing 查看
-    prof.export_chrome_trace("trace.json")
+    print("=" * 50)
+    print("[Profiler Table] Top Ops by CPU Time")
+    print(prof.key_averages().table(sort_by="self_cpu_time_total", row_limit=15))
+
+    if use_cuda:
+        print("=" * 50)
+        print("[Profiler Table] Top Ops by CUDA Time")
+        print(prof.key_averages().table(sort_by="self_cuda_time_total", row_limit=15))

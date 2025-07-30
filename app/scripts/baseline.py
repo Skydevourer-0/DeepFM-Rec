@@ -8,6 +8,7 @@ from app.models.fm_model import FMModule
 from app.train import Trainer
 from tests.test_performance import test_performance_one_epoch
 
+
 def main():
     data_path = Path("resources/data")
     encoded_path = data_path / "encoded"

@@ -1,4 +1,5 @@
 /resources/data
 /tmp
+/logs
 .pytest_cache/
 **/__pycache__

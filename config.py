@@ -1,3 +1,8 @@
+from pathlib import Path
+
+# 配置项目根目录
+PROJECT_ROOT = Path(__file__).resolve().parent
+
 FEAT_NAMES = {
     # 稠密（数值）特征列
     "dense_feats": ["age"],

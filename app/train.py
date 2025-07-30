@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import time
 from pathlib import Path
@@ -8,6 +9,7 @@ import torch
 from loguru import logger
 from sklearn.metrics import mean_absolute_error
 from torch.nn import Module, functional
+from torch.profiler import profile, record_function
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -108,8 +110,20 @@ class Trainer:
     def _save_best_model(self):
         self.best_model_state = copy.deepcopy(self.model.state_dict())
 
-    def _one_epoch(self, dataloader: DataLoader, training: bool = True):
-        """一轮内进行梯度下降或指标计算"""
+    def _one_epoch(
+        self,
+        dataloader: DataLoader,
+        training: bool = True,
+        profile: Optional[profile] = None,
+    ):
+        """
+        一轮内进行梯度下降或指标计算
+
+        :param dataloader: DataLoader 实例，提供数据批次
+        :param training: 是否为训练模式，默认为 True
+        :param profile: 性能分析器实例，默认为 None
+        :return: 平均损失和 MAE 指标
+        """
         # 调用 训练/验证 方法
         if training:
             self.model.train()
@@ -118,34 +132,45 @@ class Trainer:
 
         epoch_loss = 0
         preds, targets = [], []
+        # 若开启性能分析，设下埋点，否则使用空上下文管理器
+        context = lambda point: (
+            record_function(point) if profile else contextlib.nullcontext()
+        )
 
         for batch in tqdm(
             dataloader, desc="Training" if training else "Validate", ncols=100
         ):
             # 将张量移动到设备中，便于 gpu 优化
-            labels, samples = RecDataManager.to_device(batch, self.device)
+            with context("batch_to_device"):
+                labels, samples = RecDataManager.to_device(batch, self.device)
             # 梯度置零
             if training:
                 self.optimizer.zero_grad()
             # 根据参数设置是否计算梯度
             with torch.set_grad_enabled(training):
                 # __call__() 自动调用 forward() 等方法
-                logits = self.model(samples)
+                with context("forward_pass"):
+                    logits = self.model(samples)
                 # 模型输出结果需要 min-max 归一化，与数据预处理中标签的处理一致
                 logits = min_max_scale_tensor(logits)
                 # 回归模型，采用 MSE (均方误差)
                 loss = functional.mse_loss(logits, labels)
                 if training:
                     # 反向传播
-                    loss.backward()
+                    with context("backward_pass"):
+                        loss.backward()
                     # 优化器进行梯度下降
-                    self.optimizer.step()
+                    with context("optimizer_step"):
+                        self.optimizer.step()
             # 记录当前 batch 损失
             epoch_loss += loss.item()
             # 记录当前 batch 预测值和真实值
             # 使用 detach 断开 logits 与计算图的链接
             preds.append(logits.detach())
             targets.append(labels)
+            # 如果开启了性能分析，记录当前操作
+            if profile:
+                profile.step()
 
         # 计算平均损失
         avg_loss = epoch_loss / len(dataloader)

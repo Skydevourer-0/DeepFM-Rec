@@ -1,5 +1,6 @@
 import contextlib
 import copy
+import math
 import time
 from pathlib import Path
 from typing import Optional
@@ -51,10 +52,14 @@ class TrainMetrics:
             logger.warning("没有可绘制的指标数据")
             return
 
-        plt.figure(figsize=(6 * n_plots, 5))
+        # 计算 2x2 排布
+        cols = 2 if n_plots > 1 else 1
+        rows = math.ceil(n_plots / cols)
+
+        plt.figure(figsize=(6 * cols, 5 * rows))
 
         for i, (name, values) in enumerate(metrics_to_plot.items(), 1):
-            plt.subplot(1, n_plots, i)
+            plt.subplot(rows, cols, i)
             plt.plot(epochs, values, marker="o")
             plt.xlabel("Epoch")
             plt.ylabel(name)
@@ -69,7 +74,7 @@ class TrainMetrics:
             plt.savefig(save_path, dpi=300)
             logger.info(f"指标图已保存至: {save_path}")
 
-        plt.show()
+        plt.draw()
 
 
 class Trainer:

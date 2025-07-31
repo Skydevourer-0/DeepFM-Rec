@@ -130,7 +130,7 @@ class Trainer:
         else:
             self.model.eval()
 
-        epoch_loss = 0
+        epoch_loss = []
         preds, targets = [], []
         # 若开启性能分析，设下埋点，否则使用空上下文管理器
         context = lambda point: (
@@ -163,7 +163,7 @@ class Trainer:
                     with context("optimizer_step"):
                         self.optimizer.step()
             # 记录当前 batch 损失
-            epoch_loss += loss.item()
+            epoch_loss.append(loss.detach())
             # 记录当前 batch 预测值和真实值
             # 使用 detach 断开 logits 与计算图的链接
             preds.append(logits.detach())
@@ -173,7 +173,7 @@ class Trainer:
                 profile.step()
 
         # 计算平均损失
-        avg_loss = epoch_loss / len(dataloader)
+        avg_loss = torch.mean(torch.stack(epoch_loss)).item()
         # 计算 MAE(平均绝对误差)指标
         mae_score = 0.0
         preds = torch.cat(preds).flatten()

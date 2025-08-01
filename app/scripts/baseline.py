@@ -4,9 +4,8 @@ from loguru import logger
 
 from app.data.manager import RecDataManager
 from app.data.preprocessor import DataPreprocessor
-from app.models.fm_model import FMModule
+from app.models.deep_fm import DeepFM
 from app.train import Trainer
-from tests.test_performance import test_performance_one_epoch
 
 
 def main():
@@ -21,7 +20,7 @@ def main():
         # 分割数据集
         manager = RecDataManager(encoded_feats, n_samples=n_samples)
         train_loader, valid_loader, test_loader = manager.split(
-            num_workers=4, pin_memory=True, train_size=0.1
+            num_workers=4, pin_memory=True
         )
     except Exception as e:
         logger.exception(f"数据预处理出错: {repr(e)}")
@@ -29,21 +28,16 @@ def main():
 
     try:
         # 构造模型实例
-        fm_model = FMModule(sparse_shapes)
+        model = DeepFM(sparse_shapes)
         # 构造训练器实例
-        trainer = Trainer(fm_model, train_loader, valid_loader)
-        # # 开始训练
-        # best_model, metrics = trainer.train(epochs=100)
-        # # 绘制指标
-        # metrics.draw(model_path / "metrics.jpg")
-        # # 保存训练结果
-        # trainer.save_model(model_path / "model_weights.pth", best_model)
-        # # 测试模型
-        # loss, mse = trainer.evaluate(test_loader, best_model)
-        # 训练一轮
-        test_performance_one_epoch(trainer, train_loader)
-        # loss, mae = trainer._one_epoch(train_loader, training=True)
-        # logger.info(f"测试集评估指标: MSE 损失: {loss:.4f}, MAE 损失: {mae:.4f}")
+        trainer = Trainer(model, train_loader, valid_loader)
+        # 开始训练
+        best_model, metrics = trainer.train(epochs=50)
+        # 绘制指标
+        metrics.draw(model_path / "metrics.jpg")
+        # 测试模型
+        loss, mae = trainer.evaluate(test_loader, best_model)
+        logger.info(f"测试集评估指标: MSE 损失: {loss:.4f}, MAE 损失: {mae:.4f}")
 
     except Exception as e:
         logger.exception(f"模型训练出错: {repr(e)}")

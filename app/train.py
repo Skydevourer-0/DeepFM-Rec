@@ -129,7 +129,8 @@ class Trainer:
         :param profile: 性能分析器实例，默认为 None
         :return: 平均损失和 MAE 指标
         """
-        # 调用 训练/验证 方法
+        # 切换模型到训练或评估模式
+        # 训练模式下启用 Dropout 和 BatchNorm 等层的训练行为，否则关闭
         if training:
             self.model.train()
         else:

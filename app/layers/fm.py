@@ -33,26 +33,45 @@ class FactorizationMachine(nn.Module):
         self.feat_order = list(sparse_shapes.keys()) + FEAT_NAMES["dense_feats"]
         # 偏置值
         self.bias = nn.Parameter(torch.zeros(1))
-        # 一阶项，embedding_dim 设为 1，即为线性映射
-        self.linear_layers = EmbeddingLayer(sparse_shapes, embedding_dim=1)
-        # 二阶项
-        self.cross_layers = EmbeddingLayer(sparse_shapes, embedding_dim=embedding_dim)
+        # 一阶项使用的嵌入向量，embedding_dim 设为 1，即为线性映射，所得结果为标量
+        self.linear_layer = EmbeddingLayer(sparse_shapes, embedding_dim=1)
+        # 二阶项使用的嵌入向量，embedding_dim 可调
+        self.embed_layer = EmbeddingLayer(sparse_shapes, embedding_dim=embedding_dim)
+        # 缓存堆叠嵌入向量
+        self.cached_embeds = None
+
+    def _stack_embeds(
+        self, samples: dict[str, torch.Tensor], embed_layer: EmbeddingLayer
+    ) -> torch.Tensor:
+        """
+        将嵌入向量堆叠成一个张量，便于后续计算
+        :param samples: 输入样本，字典形式，包含稀疏特征和稠密特征
+        :param embed_layer: 嵌入层实例，用于获取嵌入向量
+        :return: 嵌入向量的堆叠结果, (batches, num_feats, embedding_dim)
+        """
+        # 获取嵌入向量, dict[str, (batches, embedding_dim)]
+        embeds = embed_layer.forward(samples)
+        # 堆叠嵌入向量, (batches, num_feats, embedding_dim)
+        return torch.stack([embeds[feat] for feat in self.feat_order], dim=1)
+
+    def get_cached_embeds(self) -> torch.Tensor:
+        """
+        获取缓存的堆叠嵌入向量
+        :return: 缓存的堆叠嵌入向量
+        """
+        if self.cached_embeds is None:
+            raise ValueError("不存在缓存的嵌入向量，请先调用 FM 层的 forward 方法。")
+        return self.cached_embeds
 
     def forward(self, samples: dict[str, torch.Tensor]):
-        # 一阶项
-        linear_embeds = self.linear_layers.forward(samples)
-        # (batches, 1, 1)
-        linear_embeds = torch.stack(
-            [linear_embeds[feat] for feat in self.feat_order], dim=1
-        )
+        # 一阶项, (batches, 1, 1)
+        linear_embeds = self._stack_embeds(samples, self.linear_layer)
         # 一阶项求和
         first_order = linear_embeds.sum(dim=1).squeeze(-1)
-        # 二阶项
-        cross_embeds = self.cross_layers.forward(samples)
-        # (batches, num_feats, embedding_dim)
-        cross_embeds = torch.stack(
-            [cross_embeds[feat] for feat in self.feat_order], dim=1
-        )
+        # 二阶项, (batches, num_feats, embedding_dim)
+        cross_embeds = self._stack_embeds(samples, self.embed_layer)
+        # 缓存堆叠嵌入向量以便复用
+        self.cached_embeds = cross_embeds
         # 二阶项求和
         # 0.5 * (sum(vi) **2 - sum(vi **2))
         sum_square = cross_embeds.sum(dim=1) ** 2

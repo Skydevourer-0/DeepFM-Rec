@@ -226,7 +226,7 @@ class DataPreprocessor:
 
 if __name__ == "__main__":
     data_path = Path("resources/data")
-    preprocessor = DataPreprocessor(data_path / "raw")
+    preprocessor = DataPreprocessor(data_path / "raw/ml-10m")
     try:
         encoded_path = data_path / "encoded"
         encoded_feats = preprocessor.fit_transform(encoded_path)
